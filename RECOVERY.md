@@ -112,7 +112,12 @@ adb install -r app-release.apk
 adb shell dpm set-device-owner com.pahtrik.warden/.WardenAdminReceiver
 # Expect: "Success: Device owner set to package com.pahtrik.warden/..."
 
-# 5. Re-add the Samsung account on the phone (stays permanently).
+# 5. Grant usage access (REQUIRED for the "session time limit" feature —
+#    GET_USAGE_STATS is an app-op, not a runtime permission, so it must be
+#    granted here, not from inside the app):
+adb shell appops set com.pahtrik.warden GET_USAGE_STATS allow
+
+# 6. Re-add the Samsung account on the phone (stays permanently).
 ```
 
 Then open **Personal MDM** (fingerprint) and switch on your policies. The
