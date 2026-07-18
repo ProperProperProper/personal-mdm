@@ -212,6 +212,19 @@
                 android:layout_height="wrap_content" />
 
             <TextView
+                android:id="@+id/usageAccessStatus"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <Button
+                android:id="@+id/grantUsageAccess"
+                android:text="Grant usage access"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
                 android:text="Exempt (never limited): Clock/alarm, Phone, Messages. 30-min cooldown before a closed app can reopen."
                 android:textSize="11sp"
                 android:paddingBottom="4dp"
