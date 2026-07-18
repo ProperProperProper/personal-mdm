@@ -49,6 +49,8 @@ object Warden {
     // Blocks BT PAN / USB tethering / Ethernet / Wi-Fi hotspot internet sharing.
     // Does NOT affect adb/USB debugging (that is the debug bridge, not tethering).
     const val T_BLOCK_TETHERING = "toggle_block_tethering"
+    const val T_WIFI_LOCK = "toggle_wifi_lock"
+    private const val KEY_WIFI_SSIDS = "wifi_ssids"
     const val T_SETTINGS_LOCKDOWN = "toggle_settings_lockdown"
     /** Accident-prone Settings surfaces locked by the master lockdown toggle. */
     private val LOCKDOWN_RESTRICTIONS = listOf(
@@ -270,6 +272,7 @@ object Warden {
             T_BLOCK_TETHERING ->
                 if (on) d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_TETHERING)
                 else d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_TETHERING)
+            T_WIFI_LOCK -> applyWifiLock(ctx, on)
             T_BLUETOOTH_LOCK ->
                 if (on) {
                     d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_BLUETOOTH)
@@ -469,6 +472,46 @@ object Warden {
         // Auto-lock timeout 60s
         d.setMaximumTimeToLock(a, if (on) 60_000L else 0L)
         AuditLog.add(ctx, "PASSWORD hardening = $on")
+    }
+
+    // ---- Wi-Fi lock: allowlisted SSIDs only ----
+
+    fun wifiSsids(ctx: Context): List<String> {
+        val raw = prefs(ctx).getString(KEY_WIFI_SSIDS, "Pahtrik Proper") ?: ""
+        return raw.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    fun setWifiSsids(ctx: Context, text: String) {
+        prefs(ctx).edit().putString(KEY_WIFI_SSIDS, text).apply()
+        AuditLog.add(ctx, "WIFI SSID allowlist updated")
+        if (getToggle(ctx, T_WIFI_LOCK)) applyWifiLock(ctx, true)
+    }
+
+    fun applyWifiLock(ctx: Context, on: Boolean) {
+        if (!isDeviceOwner(ctx)) return
+        val d = dpm(ctx); val a = admin(ctx)
+        if (on) {
+            // Restrict connections to the allowlisted SSIDs (API 33+)
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                runCatching {
+                    val ssids = wifiSsids(ctx).map {
+                        android.net.wifi.WifiSsid.fromBytes(it.toByteArray(Charsets.UTF_8))
+                    }.toSet()
+                    val policy = android.app.admin.WifiSsidPolicy(
+                        android.app.admin.WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_ALLOWLIST, ssids)
+                    d.setWifiSsidPolicy(policy)
+                }
+            }
+            // No adding/editing networks
+            runCatching { d.addUserRestriction(a, "no_add_wifi_config") } // API 33 literal
+            d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_WIFI)
+            AuditLog.add(ctx, "WIFI locked to: ${wifiSsids(ctx).joinToString()}")
+        } else {
+            if (android.os.Build.VERSION.SDK_INT >= 33)
+                runCatching { d.setWifiSsidPolicy(null) }
+            runCatching { d.clearUserRestriction(a, "no_add_wifi_config") }
+            d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_WIFI)
+        }
     }
 
     // ---- microphone: calls only ----
