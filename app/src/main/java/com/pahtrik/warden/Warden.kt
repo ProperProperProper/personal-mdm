@@ -258,7 +258,7 @@ object Warden {
             T_MIC_CALLS_ONLY -> applyMicPolicy(ctx, on)
             T_TIME_LIMITS -> {
                 if (on) {
-                    grantUsageAccess(ctx); scheduleUsageGuard(ctx)
+                    scheduleUsageGuard(ctx)
                     runCatching { d.setAutoTimeEnabled(a, true) } // clock from network
                     d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_DATE_TIME)
                 } else d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_DATE_TIME)
@@ -603,13 +603,29 @@ object Warden {
         }
     }
 
-    /** As device owner, grant ourselves usage-access so limits can be metered. */
-    fun grantUsageAccess(ctx: Context) {
-        if (!isDeviceOwner(ctx)) return
+    /**
+     * Usage access (GET_USAGE_STATS) is an app-op, NOT a runtime permission, so
+     * it cannot be granted with setPermissionGrantState. It is granted once via
+     * adb (`appops set com.pahtrik.warden GET_USAGE_STATS allow`) — see RECOVERY.md
+     * — or by the user in Settings > Usage access. This checks whether it is
+     * actually in effect.
+     */
+    fun hasUsageAccess(ctx: Context): Boolean {
+        val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE)
+                as android.app.usage.UsageStatsManager
+        val now = System.currentTimeMillis()
+        val stats = usm.queryUsageStats(
+            android.app.usage.UsageStatsManager.INTERVAL_DAILY, now - 60_000L, now)
+        return stats != null && stats.isNotEmpty()
+    }
+
+    /** Open the system Usage-access screen for this app (fallback grant path). */
+    fun openUsageAccessSettings(ctx: Context) {
         runCatching {
-            dpm(ctx).setPermissionGrantState(admin(ctx), ctx.packageName,
-                "android.permission.PACKAGE_USAGE_STATS",
-                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED)
+            ctx.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                    .setData(android.net.Uri.parse("package:${ctx.packageName}"))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
 
