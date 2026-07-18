@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         bindToggle(b.swHttpsOnly, Warden.T_HTTPS_ONLY)
         bindToggle(b.swDisableNfc, Warden.T_DISABLE_NFC)
         bindToggle(b.swAppScreenshotGuard, Warden.T_APP_SCREENSHOT_GUARD)
+        bindToggle(b.swBluetoothLock, Warden.T_BLUETOOTH_LOCK)
         bindToggle(b.swSettingsLockdown, Warden.T_SETTINGS_LOCKDOWN)
         bindToggle(b.swLinkGuard, Warden.T_LINK_GUARD)
         bindToggle(b.swAutoclear, Warden.T_CHROME_AUTOCLEAR)
