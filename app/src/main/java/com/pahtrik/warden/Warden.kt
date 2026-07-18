@@ -502,13 +502,24 @@ object Warden {
                     d.setWifiSsidPolicy(policy)
                 }
             }
+            // Reject open/WEP rogue APs: require >= WPA2/WPA3-Personal.
+            // (Blocks an "open evil twin" copying the SSID.)
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                runCatching {
+                    d.setMinimumRequiredWifiSecurityLevel(
+                        DevicePolicyManager.WIFI_SECURITY_PERSONAL)
+                }
+            }
             // No adding/editing networks
             runCatching { d.addUserRestriction(a, "no_add_wifi_config") } // API 33 literal
             d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_WIFI)
-            AuditLog.add(ctx, "WIFI locked to: ${wifiSsids(ctx).joinToString()}")
+            AuditLog.add(ctx, "WIFI locked to: ${wifiSsids(ctx).joinToString()} (min security: PERSONAL)")
         } else {
-            if (android.os.Build.VERSION.SDK_INT >= 33)
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
                 runCatching { d.setWifiSsidPolicy(null) }
+                runCatching { d.setMinimumRequiredWifiSecurityLevel(
+                    DevicePolicyManager.WIFI_SECURITY_OPEN) }
+            }
             runCatching { d.clearUserRestriction(a, "no_add_wifi_config") }
             d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_WIFI)
         }
