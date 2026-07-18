@@ -120,6 +120,15 @@ class MainActivity : AppCompatActivity() {
             b.auditView.text = AuditLog.read(this).take(100).joinToString("\n")
         }
 
+        val hasUsage = Warden.hasUsageAccess(this)
+        b.usageAccessStatus.text = if (hasUsage)
+            "Usage access: GRANTED — time limits functional"
+        else
+            "Usage access: NOT granted — time limits will NOT work until granted"
+        b.grantUsageAccess.visibility =
+            if (hasUsage) android.view.View.GONE else android.view.View.VISIBLE
+        b.grantUsageAccess.setOnClickListener { Warden.openUsageAccessSettings(this) }
+
         b.sessionLimit.setText(Warden.sessionLimitMin(this).toString())
         b.saveTimeLimits.setOnClickListener {
             val m = b.sessionLimit.text.toString().toIntOrNull() ?: 120
