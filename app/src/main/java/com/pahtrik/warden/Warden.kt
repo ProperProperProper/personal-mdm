@@ -42,6 +42,10 @@ object Warden {
     const val T_HTTPS_ONLY = "toggle_https_only"
     const val T_DISABLE_NFC = "toggle_disable_nfc"
     const val T_APP_SCREENSHOT_GUARD = "toggle_app_screenshot_guard"
+    // Bluetooth: lock to the currently-bonded device (JBL TUNE BEAM, ...:19:AC).
+    // No per-MAC allowlist exists in device-owner policy; DISALLOW_CONFIG_BLUETOOTH
+    // blocks all NEW pairings while existing bonds keep working.
+    const val T_BLUETOOTH_LOCK = "toggle_bluetooth_lock"
     const val T_SETTINGS_LOCKDOWN = "toggle_settings_lockdown"
     /** Accident-prone Settings surfaces locked by the master lockdown toggle. */
     private val LOCKDOWN_RESTRICTIONS = listOf(
@@ -261,6 +265,14 @@ object Warden {
             T_SETTINGS_LOCKDOWN -> LOCKDOWN_RESTRICTIONS.forEach {
                 if (on) d.addUserRestriction(a, it) else d.clearUserRestriction(a, it)
             }
+            T_BLUETOOTH_LOCK ->
+                if (on) {
+                    d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_BLUETOOTH)
+                    d.addUserRestriction(a, UserManager.DISALLOW_BLUETOOTH_SHARING)
+                } else {
+                    d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_BLUETOOTH)
+                    d.clearUserRestriction(a, UserManager.DISALLOW_BLUETOOTH_SHARING)
+                }
             T_DISABLE_NFC ->
                 // literal key; constant added API 33 but not on all compile paths
                 if (on) d.addUserRestriction(a, "no_near_field_communication_radio")
