@@ -50,6 +50,15 @@ object Warden {
     // Does NOT affect adb/USB debugging (that is the debug bridge, not tethering).
     const val T_BLOCK_TETHERING = "toggle_block_tethering"
     const val T_WIFI_LOCK = "toggle_wifi_lock"
+    const val T_BLOCK_MIRRORING = "toggle_block_mirroring"
+    // All outbound device-to-device sharing/casting providers. adb-to-Mac is
+    // NOT here — it is the debug bridge, unaffected by any of this.
+    private val MIRRORING_PACKAGES = listOf(
+        "com.samsung.android.smartmirroring",              // Smart View / Miracast
+        "com.samsung.android.allshare.service.mediashare", // AllShare / DLNA
+        "com.samsung.android.app.sharelive",               // Quick Share
+        "com.samsung.android.mdx.kit"                       // Continuity / nearby handoff
+    )
     private const val KEY_WIFI_SSIDS = "wifi_ssids"
     const val T_SETTINGS_LOCKDOWN = "toggle_settings_lockdown"
     /** Accident-prone Settings surfaces locked by the master lockdown toggle. */
@@ -273,6 +282,12 @@ object Warden {
                 if (on) d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_TETHERING)
                 else d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_TETHERING)
             T_WIFI_LOCK -> applyWifiLock(ctx, on)
+            T_BLOCK_MIRRORING -> {
+                MIRRORING_PACKAGES.forEach { runCatching { d.setApplicationHidden(a, it, on) } }
+                // NFC "beam" file sharing (does NOT affect tap-to-pay)
+                if (on) d.addUserRestriction(a, UserManager.DISALLOW_OUTGOING_BEAM)
+                else d.clearUserRestriction(a, UserManager.DISALLOW_OUTGOING_BEAM)
+            }
             T_BLUETOOTH_LOCK ->
                 if (on) {
                     d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_BLUETOOTH)
