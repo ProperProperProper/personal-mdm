@@ -1,0 +1,6 @@
+warden-release.keystore
+app/build/
+.gradle/
+local.properties
+build/
+*.apk
