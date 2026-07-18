@@ -46,13 +46,15 @@ object Warden {
     // No per-MAC allowlist exists in device-owner policy; DISALLOW_CONFIG_BLUETOOTH
     // blocks all NEW pairings while existing bonds keep working.
     const val T_BLUETOOTH_LOCK = "toggle_bluetooth_lock"
+    // Blocks BT PAN / USB tethering / Ethernet / Wi-Fi hotspot internet sharing.
+    // Does NOT affect adb/USB debugging (that is the debug bridge, not tethering).
+    const val T_BLOCK_TETHERING = "toggle_block_tethering"
     const val T_SETTINGS_LOCKDOWN = "toggle_settings_lockdown"
     /** Accident-prone Settings surfaces locked by the master lockdown toggle. */
     private val LOCKDOWN_RESTRICTIONS = listOf(
         UserManager.DISALLOW_FACTORY_RESET,
         UserManager.DISALLOW_ADD_USER,
         UserManager.DISALLOW_REMOVE_USER,
-        UserManager.DISALLOW_CONFIG_TETHERING,
         UserManager.DISALLOW_APPS_CONTROL,      // no force-stop/clear-data/disable of apps
         UserManager.DISALLOW_UNINSTALL_APPS
     )
@@ -265,6 +267,9 @@ object Warden {
             T_SETTINGS_LOCKDOWN -> LOCKDOWN_RESTRICTIONS.forEach {
                 if (on) d.addUserRestriction(a, it) else d.clearUserRestriction(a, it)
             }
+            T_BLOCK_TETHERING ->
+                if (on) d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_TETHERING)
+                else d.clearUserRestriction(a, UserManager.DISALLOW_CONFIG_TETHERING)
             T_BLUETOOTH_LOCK ->
                 if (on) {
                     d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_BLUETOOTH)
