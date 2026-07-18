@@ -142,6 +142,12 @@
                 android:layout_height="wrap_content" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/swBlockMirroring"
+                android:text="Block all sharing/casting to other devices (Smart View, Quick Share, DLNA, beam) — adb to Mac unaffected"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/swWifiLock"
                 android:text="Lock Wi-Fi to allowed networks only"
                 android:layout_width="match_parent"
