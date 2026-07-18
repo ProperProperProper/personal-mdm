@@ -117,6 +117,11 @@ adb shell dpm set-device-owner com.pahtrik.warden/.WardenAdminReceiver
 #    granted here, not from inside the app):
 adb shell appops set com.pahtrik.warden GET_USAGE_STATS allow
 
+# 5b. Exempt from battery optimization / Doze so background enforcement
+#     (new-app gate, time-limit checker) is never throttled or frozen:
+adb shell dumpsys deviceidle whitelist +com.pahtrik.warden
+adb shell cmd appops set com.pahtrik.warden RUN_ANY_IN_BACKGROUND allow
+
 # 6. Re-add the Samsung account on the phone (stays permanently).
 ```
 
