@@ -142,6 +142,12 @@
                 android:layout_height="wrap_content" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/swBlockTethering"
+                android:text="Block tethering/hotspot (BT/USB/Ethernet) — adb dev unaffected"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/swBluetoothLock"
                 android:text="Lock Bluetooth (no new pairings; keep JBL TUNE BEAM)"
                 android:layout_width="match_parent"
@@ -149,7 +155,7 @@
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/swSettingsLockdown"
-                android:text="Lock Settings (factory reset, users, tethering, app force-stop)"
+                android:text="Lock Settings (factory reset, users, app force-stop)"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
