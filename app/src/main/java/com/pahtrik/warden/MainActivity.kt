@@ -1,15 +1,24 @@
 package com.pahtrik.warden
 
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
-import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.pahtrik.warden.databinding.ActivityMainBinding
 
@@ -18,26 +27,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var b: ActivityMainBinding
     private var unlocked = false
 
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // No screenshots/recording/cast of policy UI — toggleable, default on
+        b = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(b.root)
         if (Warden.getToggle(this, Warden.T_APP_SCREENSHOT_GUARD)) {
             window.setFlags(
                 android.view.WindowManager.LayoutParams.FLAG_SECURE,
                 android.view.WindowManager.LayoutParams.FLAG_SECURE
             )
         }
-        b = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(b.root)
-        b.content.visibility = android.view.View.GONE
+        b.content.visibility = View.GONE
         authenticate()
     }
 
     override fun onPause() {
         super.onPause()
-        // Lock again whenever the app leaves the foreground
         unlocked = false
-        b.content.visibility = android.view.View.GONE
+        b.content.visibility = View.GONE
     }
 
     override fun onResume() {
@@ -46,8 +55,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun authenticate() {
-        // Fingerprint ONLY: BIOMETRIC_STRONG excludes the A17's class-2 face
-        // unlock; no DEVICE_CREDENTIAL means no PIN/password fallback.
         val allowed = BIOMETRIC_STRONG
         if (BiometricManager.from(this).canAuthenticate(allowed) !=
             BiometricManager.BIOMETRIC_SUCCESS
@@ -60,8 +67,8 @@ class MainActivity : AppCompatActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(r: BiometricPrompt.AuthenticationResult) {
                     unlocked = true
-                    b.content.visibility = android.view.View.VISIBLE
-                    render()
+                    b.content.visibility = View.VISIBLE
+                    buildUi()
                 }
                 override fun onAuthenticationError(code: Int, msg: CharSequence) = finish()
             })
@@ -70,126 +77,264 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("Personal MDM")
                 .setSubtitle("Fingerprint required")
                 .setAllowedAuthenticators(allowed)
-                .setNegativeButtonText("Cancel") // required when no device credential
+                .setNegativeButtonText("Cancel")
                 .build()
         )
     }
 
-    private fun render() {
-        b.ownerStatus.text = if (Warden.isDeviceOwner(this))
-            "Device owner: ACTIVE — policies enforceable"
-        else
-            "Device owner: NOT SET — run:\nadb shell dpm set-device-owner com.pahtrik.warden/.WardenAdminReceiver"
+    // ---------- UI construction ----------
 
-        bindToggle(b.swEnforce, Warden.T_ENFORCE_WHITELIST)
-        bindToggle(b.swGate, Warden.T_GATE_NEW_APPS)
-        bindToggle(b.swBlockInstalls, Warden.T_BLOCK_INSTALLS)
-        bindToggle(b.swBlockUninstalls, Warden.T_BLOCK_UNINSTALLS)
-        bindToggle(b.swBlockUnknown, Warden.T_BLOCK_UNKNOWN_SOURCES)
-        bindToggle(b.swCookies, Warden.T_COOKIE_ALLOWLIST)
-        bindToggle(b.swDns, Warden.T_SECURE_DNS)
-        bindToggle(b.swKiosk, Warden.T_KIOSK_HOME)
-        bindToggle(b.swDownloads, Warden.T_BLOCK_DOWNLOADS)
-        bindToggle(b.swHttpsOnly, Warden.T_HTTPS_ONLY)
-        bindToggle(b.swDisableNfc, Warden.T_DISABLE_NFC)
-        bindToggle(b.swAppScreenshotGuard, Warden.T_APP_SCREENSHOT_GUARD)
-        bindToggle(b.swBlockMirroring, Warden.T_BLOCK_MIRRORING)
-        bindToggle(b.swWifiLock, Warden.T_WIFI_LOCK)
-        b.wifiSsids.setText(Warden.wifiSsids(this).joinToString("\n"))
-        b.saveWifi.setOnClickListener {
-            Warden.setWifiSsids(this, b.wifiSsids.text.toString())
-            Toast.makeText(this, "Allowed Wi-Fi saved", Toast.LENGTH_SHORT).show()
-        }
-        bindToggle(b.swBlockTethering, Warden.T_BLOCK_TETHERING)
-        bindToggle(b.swBluetoothLock, Warden.T_BLUETOOTH_LOCK)
-        bindToggle(b.swSettingsLockdown, Warden.T_SETTINGS_LOCKDOWN)
-        bindToggle(b.swLinkGuard, Warden.T_LINK_GUARD)
-        bindToggle(b.swAutoclear, Warden.T_CHROME_AUTOCLEAR)
-        bindToggle(b.swSafeboot, Warden.T_DISABLE_SAFEBOOT)
-        bindToggle(b.swPassword, Warden.T_PASSWORD_HARDENING)
-        bindToggle(b.swNoCapture, Warden.T_NO_SCREEN_CAPTURE)
-        bindToggle(b.swMic, Warden.T_MIC_CALLS_ONLY)
-        bindToggle(b.swTimeLimits, Warden.T_TIME_LIMITS)
-        bindToggle(b.swBlockUserCa, Warden.T_BLOCK_USER_CA)
+    private fun buildUi() {
+        val root = b.container
+        root.removeAllViews()
 
-        b.scanCerts.setOnClickListener {
-            val flags = CertScanner.scanAndLog(this)
-            b.certScanResult.text = if (flags.isEmpty())
-                "No cert-sensitive apps flagged."
-            else flags.joinToString("\n") { "⚠ ${it.label}: ${it.reasons.joinToString(", ")}" }
-            b.auditView.text = AuditLog.read(this).take(100).joinToString("\n")
+        // Device-owner banner
+        root.addView(banner(
+            if (Warden.isDeviceOwner(this))
+                "● Device owner active — policies enforceable"
+            else
+                "○ NOT device owner — enrol via adb (see README). Toggles won't enforce."
+        ))
+
+        Features.sections.forEach { section ->
+            root.addView(sectionHeader(section.title))
+            section.features.forEach { f -> root.addView(featureCard(f)) }
         }
 
-        val hasUsage = Warden.hasUsageAccess(this)
-        b.usageAccessStatus.text = if (hasUsage)
-            "Usage access: GRANTED — time limits functional"
-        else
-            "Usage access: NOT granted — time limits will NOT work until granted"
-        b.grantUsageAccess.visibility =
-            if (hasUsage) android.view.View.GONE else android.view.View.VISIBLE
-        b.grantUsageAccess.setOnClickListener { Warden.openUsageAccessSettings(this) }
-
-        b.sessionLimit.setText(Warden.sessionLimitMin(this).toString())
-        b.saveTimeLimits.setOnClickListener {
-            val m = b.sessionLimit.text.toString().toIntOrNull() ?: 120
-            Warden.setSessionLimit(this, m)
-            Toast.makeText(this, "Session limit: $m min", Toast.LENGTH_SHORT).show()
-        }
-
-        b.auditView.text = AuditLog.read(this).take(100).joinToString("\n")
-        b.clearAudit.setOnClickListener {
-            AuditLog.clear(this); b.auditView.text = ""
-        }
-
-        b.dnsHost.setText(Warden.dnsHost(this))
-        b.dnsHost.setOnFocusChangeListener { _, focused ->
-            if (!focused) {
-                Warden.setDnsHost(this, b.dnsHost.text.toString())
-                Warden.applyDnsPolicy(this, Warden.getToggle(this, Warden.T_SECURE_DNS))
-                    ?.let { Toast.makeText(this, "DNS: $it", Toast.LENGTH_LONG).show() }
+        // Per-app whitelist
+        root.addView(sectionHeader("App whitelist"))
+        root.addView(card {
+            it.addView(hint("Apps allowed to run when 'Enforce app whitelist' is on."))
+            val rv = RecyclerView(this)
+            rv.layoutManager = LinearLayoutManager(this)
+            rv.isNestedScrollingEnabled = false
+            rv.adapter = AppAdapter(Warden.candidateApps(this)) { pkg, on ->
+                Warden.setWhitelisted(this, pkg, on)
             }
-        }
+            it.addView(rv)
+        })
 
-        b.cookieSites.setText(Warden.cookieSites(this).joinToString("\n"))
-        b.saveCookies.setOnClickListener {
-            Warden.setCookieSites(this, b.cookieSites.text.toString())
-            Toast.makeText(this, "Cookie allowlist saved", Toast.LENGTH_SHORT).show()
-        }
-
-        b.appList.layoutManager = LinearLayoutManager(this)
-        b.appList.adapter = AppAdapter(Warden.candidateApps(this)) { pkg, on ->
-            Warden.setWhitelisted(this, pkg, on)
-        }
-
-        bindToggle(b.swFirewall, Warden.T_NET_FIREWALL)
-        val allowed = Warden.netAllowed(this)
-        b.netList.layoutManager = LinearLayoutManager(this)
-        b.netList.adapter = NetAdapter(
-            Warden.candidateApps(this).map { app ->
-                NetRow(app.pkg, app.label,
-                    necessary = app.pkg in Warden.NET_NECESSARY,
-                    allowed = app.pkg in allowed)
-            }
-        ) { pkg, on -> Warden.setNetAllowed(this, pkg, on) }
-
-        val pending = Warden.pending(this)
-        b.pendingHeader.text =
-            if (pending.isEmpty()) "No pending approvals"
-            else "Pending approval: ${pending.joinToString()}"
+        // Audit log
+        root.addView(sectionHeader("Audit log"))
+        root.addView(card {
+            val clear = MaterialButton(this)
+            clear.text = "Clear log"
+            val log = mono(AuditLog.read(this).take(120).joinToString("\n"))
+            clear.setOnClickListener { _ -> AuditLog.clear(this); log.text = "" }
+            it.addView(clear)
+            it.addView(log)
+        })
     }
 
-    private fun bindToggle(sw: MaterialSwitch, key: String) {
+    private fun banner(text: String): View {
+        val tv = TextView(this)
+        tv.text = text
+        tv.setPadding(dp(16), dp(14), dp(16), dp(14))
+        tv.textSize = 13f
+        val card = MaterialCardView(this)
+        card.radius = dp(14).toFloat()
+        card.setContentPadding(0, 0, 0, 0)
+        card.addView(tv)
+        card.layoutParams = marginParams()
+        return card
+    }
+
+    private fun sectionHeader(title: String): View {
+        val tv = TextView(this)
+        tv.text = title.uppercase()
+        tv.setTextColor(ContextCompat.getColor(this, R.color.warden_primary))
+        tv.textSize = 12f
+        tv.setTypeface(tv.typeface, android.graphics.Typeface.BOLD)
+        tv.letterSpacing = 0.08f
+        tv.setPadding(dp(8), dp(18), dp(8), dp(6))
+        return tv
+    }
+
+    /** A feature card: title + ⓘ + switch, plus optional inline editor. */
+    private fun featureCard(f: Feature): View = card { col ->
+        val row = LinearLayout(this)
+        row.orientation = LinearLayout.HORIZONTAL
+        row.gravity = Gravity.CENTER_VERTICAL
+
+        val title = TextView(this)
+        title.text = f.title
+        title.textSize = 16f
+        title.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+
+        val info = android.widget.ImageButton(this)
+        info.setImageResource(R.drawable.ic_info)
+        info.background = null
+        info.setPadding(dp(8), dp(8), dp(8), dp(8))
+        info.contentDescription = "About ${f.title}"
+        info.setOnClickListener { showInfo(f) }
+
+        val sw = MaterialSwitch(this)
+        bindSwitch(sw, f.key)
+
+        row.addView(title); row.addView(info); row.addView(sw)
+        col.addView(row)
+
+        f.editor?.let { col.addView(buildEditor(it)) }
+    }
+
+    private fun showInfo(f: Feature) {
+        val body = buildString {
+            append(f.what)
+            append("\n\n▲ Turn ON:  "); append(f.whyOn)
+            append("\n▼ Leave OFF:  "); append(f.whyOff)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(f.title)
+            .setMessage(body)
+            .setPositiveButton("Got it", null)
+            .show()
+    }
+
+    private fun bindSwitch(sw: MaterialSwitch, key: String) {
         sw.setOnCheckedChangeListener(null)
         sw.isChecked = Warden.getToggle(this, key)
         sw.setOnCheckedChangeListener { _, on ->
-            if (!Warden.isDeviceOwner(this)) {
-                Toast.makeText(this, "Not device owner - toggle saved but not enforced", Toast.LENGTH_SHORT).show()
-            }
+            if (!Warden.isDeviceOwner(this))
+                Toast.makeText(this, "Not device owner — saved but not enforced", Toast.LENGTH_SHORT).show()
             Warden.setToggle(this, key, on)
-            if (key == Warden.T_ENFORCE_WHITELIST) render()
         }
     }
+
+    // ---------- inline editors ----------
+
+    private fun buildEditor(kind: String): View = when (kind) {
+        "session" -> vbox { box ->
+            val status = TextView(this)
+            val has = Warden.hasUsageAccess(this)
+            status.text = if (has) "Usage access: granted — limits functional"
+                          else "Usage access: NOT granted — limits won't work"
+            status.textSize = 12f
+            status.setTypeface(status.typeface, android.graphics.Typeface.BOLD)
+            box.addView(status)
+            if (!has) box.addView(MaterialButton(this).apply {
+                text = "Grant usage access"
+                setOnClickListener { Warden.openUsageAccessSettings(this@MainActivity) }
+            })
+            val field = numField("Minutes an app may stay open", Warden.sessionLimitMin(this).toString())
+            box.addView(field)
+            box.addView(saveBtn("Save session limit") {
+                Warden.setSessionLimit(this, field.text.toString().toIntOrNull() ?: 120)
+            })
+            box.addView(hint("Exempt: Clock, Phone, Messages. 30-min cooldown before reopen."))
+        }
+        "dns" -> vbox { box ->
+            val field = textField("DoT hostname, e.g. dns.quad9.net", Warden.dnsHost(this))
+            box.addView(field)
+            box.addView(saveBtn("Save DNS host") {
+                Warden.setDnsHost(this, field.text.toString())
+            })
+        }
+        "cookies" -> vbox { box ->
+            val field = multiField("Allowed cookie sites, one per line", Warden.cookieSites(this).joinToString("\n"))
+            box.addView(field)
+            box.addView(saveBtn("Save cookie allowlist") {
+                Warden.setCookieSites(this, field.text.toString())
+            })
+        }
+        "wifi" -> vbox { box ->
+            val field = multiField("Allowed Wi-Fi SSIDs, one per line", Warden.wifiSsids(this).joinToString("\n"))
+            box.addView(field)
+            box.addView(saveBtn("Save allowed Wi-Fi") {
+                Warden.setWifiSsids(this, field.text.toString())
+            })
+        }
+        "netlist" -> vbox { box ->
+            box.addView(hint("Which apps may use the internet. 'Necessary' apps are locked on."))
+            val rv = RecyclerView(this)
+            rv.layoutManager = LinearLayoutManager(this)
+            rv.isNestedScrollingEnabled = false
+            val allowed = Warden.netAllowed(this)
+            rv.adapter = NetAdapter(Warden.candidateApps(this).map {
+                NetRow(it.pkg, it.label, it.pkg in Warden.NET_NECESSARY, it.pkg in allowed)
+            }) { pkg, on -> Warden.setNetAllowed(this, pkg, on) }
+            box.addView(rv)
+        }
+        "certscan" -> vbox { box ->
+            val result = TextView(this); result.textSize = 11f
+            box.addView(MaterialButton(this).apply {
+                text = "Scan for cert-sensitive apps"
+                setOnClickListener {
+                    val flags = CertScanner.scanAndLog(this@MainActivity)
+                    result.text = if (flags.isEmpty()) "No cert-sensitive apps flagged."
+                        else flags.joinToString("\n") { "⚠ ${it.label}: ${it.reasons.joinToString(", ")}" }
+                }
+            })
+            box.addView(result)
+        }
+        else -> View(this)
+    }
+
+    // ---------- small view helpers ----------
+
+    private fun card(build: (LinearLayout) -> Unit): View {
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(dp(16), dp(12), dp(16), dp(12))
+        build(col)
+        val mc = MaterialCardView(this)
+        mc.radius = dp(16).toFloat()
+        mc.cardElevation = dp(1).toFloat()
+        mc.layoutParams = marginParams()
+        mc.addView(col)
+        return mc
+    }
+
+    private fun vbox(build: (LinearLayout) -> Unit): LinearLayout {
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(0, dp(8), 0, 0)
+        build(col)
+        return col
+    }
+
+    private fun marginParams(): LinearLayout.LayoutParams {
+        val lp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.setMargins(dp(4), dp(4), dp(4), dp(4))
+        return lp
+    }
+
+    private fun hint(text: String) = TextView(this).apply {
+        this.text = text; textSize = 11f; alpha = 0.7f
+        setPadding(0, dp(4), 0, dp(4))
+    }
+
+    private fun mono(text: String) = TextView(this).apply {
+        this.text = text; textSize = 11f
+        typeface = android.graphics.Typeface.MONOSPACE
+        setPadding(0, dp(8), 0, 0)
+    }
+
+    private fun textField(hintText: String, value: String) = EditText(this).apply {
+        hint = hintText; setText(value)
+        inputType = android.text.InputType.TYPE_CLASS_TEXT or
+            android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+    }
+
+    private fun numField(hintText: String, value: String) = EditText(this).apply {
+        hint = hintText; setText(value)
+        inputType = android.text.InputType.TYPE_CLASS_NUMBER
+    }
+
+    private fun multiField(hintText: String, value: String) = EditText(this).apply {
+        hint = hintText; setText(value); minLines = 2
+        inputType = android.text.InputType.TYPE_CLASS_TEXT or
+            android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+            android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+    }
+
+    private fun saveBtn(label: String, action: () -> Unit) = MaterialButton(this).apply {
+        text = label
+        setOnClickListener { action(); Toast.makeText(this@MainActivity, "Saved", Toast.LENGTH_SHORT).show() }
+    }
 }
+
+// ---------- RecyclerView adapters ----------
 
 data class NetRow(val pkg: String, val label: String, val necessary: Boolean, val allowed: Boolean)
 
@@ -197,21 +342,17 @@ class NetAdapter(
     private val rows: List<NetRow>,
     private val onToggle: (String, Boolean) -> Unit
 ) : RecyclerView.Adapter<NetAdapter.VH>() {
-
     class VH(val sw: MaterialSwitch) : RecyclerView.ViewHolder(sw)
-
-    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val sw = MaterialSwitch(parent.context)
-        sw.setPadding(24, 20, 24, 20)
+        sw.setPadding(8, 18, 8, 18)
         return VH(sw)
     }
-
     override fun getItemCount() = rows.size
-
     override fun onBindViewHolder(h: VH, pos: Int) {
         val r = rows[pos]
         h.sw.setOnCheckedChangeListener(null)
-        h.sw.text = if (r.necessary) "${r.label} — NECESSARY (locked)" else r.label
+        h.sw.text = if (r.necessary) "${r.label} — necessary (locked)" else r.label
         h.sw.isChecked = r.allowed || r.necessary
         h.sw.isEnabled = !r.necessary
         h.sw.setOnCheckedChangeListener { _, on -> onToggle(r.pkg, on) }
@@ -222,17 +363,13 @@ class AppAdapter(
     private val rows: List<Warden.AppRow>,
     private val onToggle: (String, Boolean) -> Unit
 ) : RecyclerView.Adapter<AppAdapter.VH>() {
-
     class VH(val sw: MaterialSwitch) : RecyclerView.ViewHolder(sw)
-
-    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val sw = MaterialSwitch(parent.context)
-        sw.setPadding(24, 20, 24, 20)
+        sw.setPadding(8, 18, 8, 18)
         return VH(sw)
     }
-
     override fun getItemCount() = rows.size
-
     override fun onBindViewHolder(h: VH, pos: Int) {
         val r = rows[pos]
         h.sw.setOnCheckedChangeListener(null)
