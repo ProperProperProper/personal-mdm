@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         bindToggle(b.swHttpsOnly, Warden.T_HTTPS_ONLY)
         bindToggle(b.swDisableNfc, Warden.T_DISABLE_NFC)
         bindToggle(b.swAppScreenshotGuard, Warden.T_APP_SCREENSHOT_GUARD)
+        bindToggle(b.swBlockMirroring, Warden.T_BLOCK_MIRRORING)
         bindToggle(b.swWifiLock, Warden.T_WIFI_LOCK)
         b.wifiSsids.setText(Warden.wifiSsids(this).joinToString("\n"))
         b.saveWifi.setOnClickListener {
